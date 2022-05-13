@@ -1,0 +1,10 @@
+2 1             	! no. of plots at screen/page (row and column)
+1 1             	! screen (1) or post-script (2), 1 for ps, 2 for eps
+1              	 	! for postscript: portrait (1) or landscape (2)
+0 0    0   10 5 1 0 Gust funct.      [-]
+1 0    0    5 5 1 1 Kh               [m2 s-1]
+1 0    0   10 5 1 1 U                [m s-1]
+0 0    0    1 5 1 1 U/U-sl           [ - ]
+1 0    0   10 5 1 1 Rib              [-]
+0 0    0   10 5 1 1 ZCFTR            [-]
+

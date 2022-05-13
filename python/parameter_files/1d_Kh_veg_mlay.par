@@ -1,0 +1,9 @@
+2 1             	! no. of plots at screen/page (row and column)
+1 2            		! screen (1) or post-script (2), 1 for ps, 2 for eps
+1               	! for postscript: portrait (1) or landscape (2)
+1 1    0  100 5 0 0 Rahveg.       [s m-1]
+1 0    0 1000 5 0 0 Rahcan.       [s m-1]
+1 0    0  500 5 1 0 Rahint.       [s m-1]
+1 0 0.01 0.25 5 1 1 Kh    	  [m-2 s-1]
+1 1 0.01    1 5 0 1 U       	  [m s-1]
+

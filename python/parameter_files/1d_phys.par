@@ -1,0 +1,23 @@
+2 2           ! no. of plots at screen/page (row and column)
+1             ! screen (1) or post-script (2)
+1             ! for postscript: portrait (1) or landscape (2)
+1 0 273 320 1 Temperature              [K]
+1 0 295 320 1 Potential temperature    [K]
+1 0   0  19 1 Water vapor              [g/kg]
+0 0   0 0.1 1 Liquid water             [g/kg]
+0 0   0   1 1 Cloud cover              [0-1]
+0 0   0 1.2 1 Density                  [kg/m3]
+1 0   0   1 1 Windspeed                [m/s]
+0 0   0   1 1 Wind direction           [deg]
+0 0   0   1 1 Temperature flux         [1E-2 K m/s]
+0 0   0   1 1 Theta (liquid) flux      [1E-2 K m/s]
+0 0   0   1 1 Total liquid water flux  [1E-4 m/s]
+0 0   0   1 1 Liquid water flux	       [1E-4 m/s]
+0 0   0   1 1 Theta (virtual) flux     [1E-2 K m/s]
+0 0   0   1 0 Cloud cover (half level) [0-1]		
+0 0   0   1 1 Mass flux                [kg m^-2 s^-1]	
+0 0   0   1 1 Theta (liquid)           [K]		
+0 0   0   1 1 qt                       [g/kg]	
+0 0   0   1 1 ql                       [g/kg]	
+0 0   0   1 1 Theta (virtual)          [K]	
+0 0   0   1 1 Tke                      [m^2/s^2]

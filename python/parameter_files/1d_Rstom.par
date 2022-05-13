@@ -1,0 +1,11 @@
+2 2             ! no. of plots at screen/page (row and column)
+1 1             ! screen (1) or post-script (2), 1 for ps, 2 for eps
+1               ! for postscript: portrait (1) or landscape (2)
+1 0    0  1.1 5 0 Ft               [0-1]
+1 0    0  1.1 5 0 Fw               [0-1]
+0 0    0  100 5 1 RH               [%]
+0 0  0.8  1.1 5 0 Fv-shade         [0-1]
+0 0  0.8  1.1 5 0 Fv-sun           [0-1]
+1 1   25  300 5 1 Fstom-H2O-Sell.  [umol m-2 s-1]
+1 1   25  750 5 1 Fstom-H2O-Ronda  [umol m-2 s-1]
+0 1   25  300 5 0 Fstom-H2O-DDIM   [umol m-2 s-1]
