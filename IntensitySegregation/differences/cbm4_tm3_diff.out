@@ -1,0 +1,1045 @@
+1,3c1,3
+<       SUBROUTINE RACMO_EBI (NSTEP,NSTOP,NPRINT,NLEV,NLEVEL,
+<      *                      PM,PMLOC,PM2M,KG3X,PTMST,
+<      *                      PPHOTCHEM,PT,PQ,PP,PRHOA,IS,LFIRST)
+---
+>       SUBROUTINE CBM4_TM3 (NSTEP,NSTOP,NPRINT,NLEV,NLEVEL,
+>      *                     PM,PMLOC,PMZZ,KG3X,PTMST,
+>      *                     MAE,PPHOTCHEM,PZ,PT,PQ,PDP,PP,PRHOA)
+6c6
+< C     *RACMO_EBI* - routine for day- and nighttime chemistry
+---
+> C     *CBM4_TM3* - routine for day- and nighttime chemistry
+9c9
+< C     described in a paper submitted to JGR (16-10-97)
+---
+> C     described in a paper in JGR 
+11c11
+< C     Interface: *RACMO_EBI* is called from *PRECHEM*
+---
+> C     Interface: *CBM4_TM3* is called from *PRECHEM*
+18,31d17
+<       LOGICAL LFIRST
+<       
+<       INTEGER MAE,MAXIT
+< 
+<       PARAMETER (MAE=11)
+< 
+< C LG-  default, the maximum number if iterations is 8 for a timestep
+< C      of 40 minutes, 2400 s. The number of maximum iterations must be
+< C      increased as a function of the timestep for timesteps shorter than
+< C      40 minutes
+< 
+< C      PARAMETER (MAXIT=8)
+< 
+< C LG-
+34c20
+<       PARAMETER (G=9.8)
+---
+>       PARAMETER (G=9.80665)
+42c28
+<       INCLUDE 'parreact.h'
+---
+>       INCLUDE 'parreact_cbm4_tm3.h'
+44,54c30,42
+<       INTEGER KG3X,NSTEP,NRESUM,IM,JKM,JL,JR,JR2T21,JR1T21,
+<      &        JL1T21,JL2T21,JR1,JR2,JK,NLEV,NLEVEL,FJR,FJL,JL1,JL2,
+<      &        INDEX,JT,JG,ITER,IW,NSTOP,NPRINT,NREACTION
+< 
+<       REAL PM(NLON,NLEVT,NTRAC),PM2M(NLON,NTRAC),PRHOA(NLON,NLEVT),
+<      *     PT(NLON,NLEVT),PQ(NLON,NLEVT),PP(NLON,NLEVT),
+<      *     PPHOTCHEM(NLON,NLEVT,NTRACT),
+<      *     PMLOC(NLON,NLEVT,KG3X)
+< C ACP-new variable for intensities of segregation added
+<       REAL IS(NBINREAC,NLEVT)
+< C ACP-end
+---
+>       INTEGER KG3X,NSTEP,IM,JKM,JL,JR,JR2T21,JR1T21,
+>      &        JL1T21,JL2T21,JR1,JR2,JK,NLEV,NLEVEL,DLEVEL,
+>      &        FJR,FJL,JL1,JL2,INDEX,JT,JG,ITER,IW,NSTOP,
+>      &        NPRINT ,JJK,MAE,KTHEIGHT,NTRAC_OUT,NREACTION(NTRAC)
+> 
+>       REAL PM(NLON,NLEVT,NTRAC),PMZZ(NLON,NTRAC),
+>      &     PRHOA(NLON,NLEVT),PZ(NLON,NLEVT),PT(NLON,NLEVT),
+>      &     PQ(NLON,NLEVT),PDP(NLON,NLEVT),PP(NLON,NLEVT),
+>      &     PPHOTCHEM(NLON,NLEVT,MAE),PMLOC(NLON,NLEVT,KG3X)
+>      
+>       REAL ZPM(NLON,NLEVEL+1,NTRAC),ZPMLOC(NLON,NLEVEL+1,NG3X),
+>      &     ZPRHOA(NLON,NLEVEL+1),ZPT(NLON,NLEVEL+1),ZPQ(NLON,NLEVEL+1),
+>      &     ZPP(NLON,NLEVEL+1),ZPPHOTCHEM(NLON,NLEVEL+1,NTRACT)
+62c50
+<      *     ,XO2N(NLON)
+---
+>      *     ,XO2N(NLON),RADON(NLON)
+69c57
+<      *     ,ORGNTR0(NLON),XO20(NLON),XO2N0(NLON)
+---
+>      *     ,ORGNTR0(NLON),XO20(NLON),XO2N0(NLON),RADON0(NLON)
+93c81
+<      *     OLDNOY,NEWNOY,CHECK
+---
+>      *     OLDNOY,NEWNOY,CHECK,RSP_LTIME
+113a102,105
+> C LG- isoprene and NO2 reaction constant
+> 
+>       REAL RISOPNO2(NLON)
+> 
+128,133d119
+< C LG- switch for calculating the concentrations at zz 
+< 
+<       LOGICAL LCALCZZ
+<       
+<       DATA LCALCZZ /.FALSE./
+< 
+147c133,135
+<       WRITE(NUNMDFL,*)'Start RACMO_EBI.f (hydrocarbon chemistry !!)'
+---
+>       ZMH2O=18.
+> 
+>       WRITE(NUNMDFL,*)'Start CBM4_TM3.f'
+149,150c137,138
+< C LG- definition of max. no of iterations, MAXIT=24 for a timestep
+< C     of 300 s (5 min.) and 16 for a timestep of 600 s (10 min.)
+---
+> C LG- definition of number of extra levels for which the chemistry 
+> C     must be calculated
+152,153c140,141
+<       MAXIT=INT(8.+2.*(2400./PTMST))
+<       MAXIT=75
+---
+>       DLEVEL=0
+>       IF (LXTMZZ) DLEVEL=DLEVEL+1	! chemistry at extra reference heigth zz
+155c143
+<       ZMH2O=18.
+---
+> C LG-  
+163c151
+<       IF (NSTEP.EQ.NRESUM.AND.LFIRST) THEN
+---
+>       IF (NSTEP.EQ.NRESUM) THEN
+217d204
+< 
+258c245,251
+<         DPM(JL,JK,JT)=-1.*PM(JL,JK,JT)
+---
+> 	IF(LBULKVEG.AND.JK.EQ.NLEV+1) THEN
+>          DPM(JL,JK,JT)=-1.*PM(JL,JK,JT)
+> 	ELSEIF(LVEG_MLAY.AND.JK.GE.NLEV+1) THEN
+>          DPM(JL,JK,JT)=-1.*PM(JL,JK,JT)
+>         ELSE
+>          DPM(JL,JK,JT)=-1.*PM(JL,JK,JT)
+> 	ENDIF	  
+264c257,263
+<         DPMLOC(JL,JK,JG)=-1.*PMLOC(JL,JK,JG)
+---
+>         IF (LBULKVEG.AND.JK.EQ.NLEV+1) THEN
+>          DPMLOC(JL,JK,JG)=-1.*PMLOC(JL,JK,JG)	 
+> 	ELSEIF(LVEG_MLAY.AND.JK.GE.NLEV+1) THEN
+>          DPMLOC(JL,JK,JG)=-1.*PMLOC(JL,JK,JG)
+>         ELSE
+>          DPMLOC(JL,JK,JG)=-1.*PMLOC(JL,JK,JG)
+>         ENDIF
+302a302,325
+> C LG- for additional chemistry calculations (at reference height zz and
+> C     within the bulk vegetation layer (both only possible for the 
+> C     "big leaf" approach and thus LBIOSPH=.FALSE.), the applied
+> C     parameter arrays are assigned the values of the first NLEVEL's 
+> C     for the first NLEVEL calculations and for the other DLEVEL 
+> C     calculations, the values representing level ZZ or the bulk 
+> C     vegetation layer are assigned  
+> 
+>       DO 99 JK=1,NLEVEL+DLEVEL
+>       DO 99 JL=1,NLON
+> 
+> C LG- assigning the tracer concentrations 
+> 
+>       DO JT=1,NTRAC
+>         IF (LBULKVEG.AND.JK.EQ.NLEV+1) THEN
+>          ZPM(JL,JK,JT)=PM(JL,JK,JT)
+> 	ELSEIF (LVEG_MLAY.AND.JK.GE.NLEV+1.AND.JK.LT.NLEVEL+1) THEN
+>          ZPM(JL,JK,JT)=PM(JL,JK,JT)  
+> 	ELSEIF (LXTMZZ.AND.JK.EQ.NLEVEL+1) THEN
+>          ZPM(JL,JK,JT)=PMZZ(JL,JT)
+>         ELSE
+>          ZPM(JL,JK,JT)=PM(JL,JK,JT)
+> 	ENDIF
+>       ENDDO
+305,308c328,369
+< C     --------
+< C     1. Start loop
+< C
+<   100 CONTINUE
+---
+> C LG- and the short-lived species
+> 
+>       DO JT=1,NG3X
+>         IF (LBULKVEG.AND.JK.EQ.NLEV+1) THEN
+>          ZPMLOC(JL,JK,JG)=PMLOC(JL,JK,JG)
+> 	ELSEIF (LVEG_MLAY.AND.JK.GE.NLEV+1.AND.JK.LT.NLEVEL+1) THEN
+>          ZPMLOC(JL,JK,JG)=PMLOC(JL,JK,JG)
+> 	ELSEIF (LXTMZZ.AND.JK.EQ.NLEVEL+1) THEN
+>          ZPMLOC(JL,JK,JG)=PMZZ(JL,JG)
+>         ELSE
+>          ZPMLOC(JL,JK,JG)=PMLOC(JL,JK,JG)
+> 	ENDIF
+>       ENDDO
+> 
+> C LG- assigning some other parameters, e.g. temperature etc.
+> 
+>       IF (LXTMZZ) THEN
+>        ZPRHOA(JL,JK)=PRHOA(JL,MIN(NLEVEL,JK))
+>        ZPQ(JL,JK)=PQ(JL,MIN(NLEVEL,JK))
+>        ZPT(JL,JK)=PT(JL,MIN(NLEVEL,JK))
+>        ZPP(JL,JK)=PP(JL,MIN(NLEV,JK))
+>       ELSE
+>        ZPRHOA(JL,JK)=PRHOA(JL,JK)
+>        ZPQ(JL,JK)=PQ(JL,JK)
+>        ZPT(JL,JK)=PT(JL,JK)
+>        ZPP(JL,JK)=PP(JL,JK)
+>       ENDIF
+> 
+> C LG- assigning the photodissociation rates 
+> 
+>       DO JT=1,MAE
+>         IF (LXTMZZ.AND.JK.EQ.NLEVEL+1) THEN       
+> 	 ZPPHOTCHEM(JL,JK,JT)=PPHOTCHEM(JL,NLEVEL,JT)
+>         ELSE 
+>          ZPPHOTCHEM(JL,JK,JT)=PPHOTCHEM(JL,JK,JT)
+>         ENDIF         
+>       ENDDO
+> 
+>    99 CONTINUE
+> 
+> C LG- end
+> C LG- the chemistry is default only calculated for the troposphere!
+310c371,377
+<       DO 101 JK=1,NLEVEL
+---
+>       IF (NSTEP.EQ.0)
+>      &  WRITE(NUNMDFL,'(1a)')
+>      &  ' The chemistry is only resolved within the troposphere'        
+> 
+>       KTHEIGHT=KTRHE(1)
+> 
+>       DO 101 JK=KTHEIGHT,NLEVEL+DLEVEL
+316c383
+<         ZRHOA=PRHOA(JL,JK)
+---
+>         ZRHOA=ZPRHOA(JL,JK)
+320c387
+<         H2O(JL)=PQ(JL,JK)*ZRHOA*6.022045E23/ZMH2O
+---
+>         H2O(JL)=ZPQ(JL,JK)*ZRHOA*6.022045E23/ZMH2O
+322d388
+< 
+326,340c392,414
+<         ZTREC=1./PT(JL,JK)
+<         ZT3REC=300./PT(JL,JK)
+<         RNOO3(JL)=(1.+IS(1,JK))*ZFARR(2.E-12,-1400.,ZTREC)     ! reaction R2
+<         RHO2NO(JL)=(1.+IS(2,JK))*ZFARR(3.7E-12,250.,ZTREC)     ! reaction R3
+<         RMO2NO(JL)=(1.+IS(3,JK))*ZFARR(4.2E-12,180.,ZTREC)     ! reaction R27
+<            RX1=2.6E-30*ZT3REC**3.2*AIR(JL)           
+<            RX2=2.4E-11*ZT3REC**1.3          
+<         RNO2OH(JL)=(1.+IS(4,JK))*ZF3BOD(RX1,RX2)               ! reaction R4
+<            RX1=ZFARR(7.2E-15,785.,ZTREC)    
+<            RX3=ZFARR(1.9E-33,725.,ZTREC)    
+<            RX4=ZFARR(4.1E-16,1440.,ZTREC)            
+<         ROHHNO3(JL)=(1.+IS(5,JK))*(RX1+RX3*AIR(JL)/
+<      *	           (1.+RX3*AIR(JL)/RX4))                       ! reaction R6     
+<         RNO2O3(JL)=(1.+IS(6,JK))*ZFARR(1.2E-13,-2450.,ZTREC)   ! reaction R7
+<         RNONO3(JL)=(1.+IS(7,JK))*ZFARR(1.5E-11,170.,ZTREC)     ! reaction R8
+---
+>         ZTREC=1./ZPT(JL,JK)
+>         ZT3REC=300./ZPT(JL,JK)
+>         RNOO3(JL)=ZFARR(2.E-12,-1400.,ZTREC)             ! reaction R2
+>         RHO2NO(JL)=ZFARR(3.7E-12,250.,ZTREC)             ! reaction R3
+>         RMO2NO(JL)=ZFARR(4.2E-12,180.,ZTREC)             ! reaction R27
+> 
+> C LG-  ! updated reaction rates Ravi           
+> 
+>            RX1=0.94*2.47E-30*ZT3REC**2.97*AIR(JL)	 
+>            RX2=1.45E-11*ZT3REC**2.77          		 
+>         RNO2OH(JL)=ZF3BOD(RX1,RX2)                       ! reaction R4
+> 
+> C LG-  ! updated reaction rates Ravi           
+> 
+>            RX1=ZFARR(2.41E-14,460.,ZTREC)		    
+>            RX3=ZFARR(6.51E-34,1335.,ZTREC)    		 
+>            RX4=ZFARR(2.69E-17,2199.,ZTREC)            	 
+>         ROHHNO3(JL)=RX1+RX3*AIR(JL)/(1.+RX3*AIR(JL)/RX4) ! reaction R6     
+> 
+> C LG-   end
+> 
+>         RNO2O3(JL)=ZFARR(1.2E-13,-2450.,ZTREC)           ! reaction R7
+>         RNONO3(JL)=ZFARR(1.5E-11,170.,ZTREC)             ! reaction R8
+343c417
+<         RNO2NO3(JL)=(1.+IS(8,JK))*ZF3BOD(RX1,RX2)              ! reaction R11
+---
+>         RNO2NO3(JL)=ZF3BOD(RX1,RX2)                      ! reaction R11
+345,346c419,420
+<         RN2O5(JL)=RNO2NO3(JL)/EQN2O5(JL)                       ! reaction R12
+<         RHNO4OH(JL)=(1.+IS(9,JK))*ZFARR(1.3E-12,380.,ZTREC)    ! reaction R16
+---
+>         RN2O5(JL)=RNO2NO3(JL)/EQN2O5(JL)                 ! reaction R12
+>         RHNO4OH(JL)=ZFARR(1.3E-12,380.,ZTREC)            ! reaction R16
+349c423
+<         RNO2HO2(JL)=(1.+IS(10,JK))*ZF3BOD(RX1,RX2)             ! reaction R14
+---
+>         RNO2HO2(JL)=ZF3BOD(RX1,RX2)                      ! reaction R14
+351,352c425,426
+<         RHNO4M(JL)=RNO2HO2(JL)/EQHNO4(JL)                      ! reaction R17
+<         RODM(JL)=.2095*ZFARR(3.2E-11,70.,ZTREC)+               ! reaction R18*
+---
+>         RHNO4M(JL)=RNO2HO2(JL)/EQHNO4(JL)                ! reaction R17
+>         RODM(JL)=.2095*ZFARR(3.2E-11,70.,ZTREC)+         ! reaction R18*
+354,361c428,435
+<         RH2OOD(JL)=(1.+IS(11,JK))*2.2E-10                      ! reaction R18*
+<         RO3HO2(JL)=(1.+IS(12,JK))*ZFARR(1.1E-14,-500.,ZTREC)   ! reaction R19
+<         RCOOH(JL)=(1.+IS(13,JK))*1.5E-13*(1.+0.6*PRESS/101325) ! reaction R36
+<         RO3OH(JL)=(1.+IS(14,JK))*ZFARR(1.6E-12,-940.,ZTREC)    ! reaction R20
+<         RHPOH(JL)=(1.+IS(15,JK))*ZFARR(2.9E-12,-160.,ZTREC)    ! reaction R24
+<         RFRMOH(JL)=(1.+IS(16,JK))*1.E-11                       ! reaction R34
+<         RCH4OH(JL)=(1.+IS(17,JK))*ZFARR(2.65E-12,-1800.,ZTREC) ! reaction R26
+<         RH2OH(JL)=1.06*ZFARR(2.65E-12,-1800.,ZTREC)            ! reaction R21     
+---
+>         RH2OOD(JL)=2.2E-10                               ! reaction R18*
+>         RO3HO2(JL)=ZFARR(1.1E-14,-500.,ZTREC)            ! reaction R19
+>         RCOOH(JL)=1.5E-13*(1.+0.6*PRESS/101325)          ! reaction R36
+>         RO3OH(JL)=ZFARR(1.6E-12,-940.,ZTREC)             ! reaction R20
+>         RHPOH(JL)=ZFARR(2.9E-12,-160.,ZTREC)             ! reaction R24
+>         RFRMOH(JL)=1.E-11                                ! reaction R34
+>         RCH4OH(JL)=ZFARR(2.65E-12,-1800.,ZTREC)          ! reaction R26
+>         RH2OH(JL)=1.06*ZFARR(2.65E-12,-1800.,ZTREC)      ! reaction R21     
+363,368c437,442
+<         ROHMPER(JL)=(1.+IS(18,JK))*ZFARR(3.8E-12,200.,ZTREC)   ! reaction R30
+<         ROHROOH(JL)=(1.+IS(19,JK))*3.E-12                      ! reaction R60
+<         RMO2MO2(JL)=(1.+IS(20,JK))*ZFARR(2.5E-13,190.,ZTREC)   ! reaction R29
+<         RMO2HO2(JL)=(1.+IS(21,JK))*ZFARR(3.8E-13,800.,ZTREC)   ! reaction R28
+<         RHO2OH(JL)=(1.+IS(22,JK))*ZFARR(4.8E-11,250.,ZTREC)    ! reaction R22
+<         RHO2HO2(JL)=(1.+IS(23,JK))*(ZFARR(2.3E-13,600.,ZTREC)+ ! reaction R23
+---
+>         ROHMPER(JL)=ZFARR(3.8E-12,200.,ZTREC)            ! reaction R30
+>         ROHROOH(JL)=3.E-12                               ! reaction R60
+>         RMO2MO2(JL)=ZFARR(2.5E-13,190.,ZTREC)            ! reaction R29
+>         RMO2HO2(JL)=ZFARR(3.8E-13,800.,ZTREC)            ! reaction R28
+>         RHO2OH(JL)=ZFARR(4.8E-11,250.,ZTREC)             ! reaction R22
+>         RHO2HO2(JL)=(ZFARR(2.3E-13,600.,ZTREC)+        ! reaction R23
+371,374c445,448
+<         RC41(JL)=(1.+IS(24,JK))*5.8E-16                        ! reaction R35
+<         RC43(JL)=(1.+IS(25,JK))*ZFARR(7.0E-12,250.,ZTREC)      ! reaction R37
+<         RC44(JL)=(1.+IS(26,JK))*2.5E-15                        ! reaction R38
+<         RC46(JL)=(1.+IS(27,JK))*ZFARR(3.5E-11,-180.,ZTREC)     ! reaction R40
+---
+>         RC41(JL)=5.8E-16                               ! reaction R35
+>         RC43(JL)=ZFARR(7.0E-12,250.,ZTREC)             ! reaction R37
+>         RC44(JL)=2.5E-15                               ! reaction R38
+>         RC46(JL)=ZFARR(3.5E-11,-180.,ZTREC)            ! reaction R40
+377,386c451,460
+<         RC47(JL)=(1.+IS(28,JK))*ZF3BOD(RX1,RX2)                ! reaction R41
+<         RC48(JL)=ZFARR(2.0E16,-13500.,ZTREC)                   ! reaction R42
+<         RC49(JL)=(1.+IS(29,JK))*2.E-12                         ! reaction R44
+<         RC50(JL)=(1.+IS(30,JK))*6.5E-12                        ! reaction R45
+<         RC52(JL)=(1.+IS(31,JK))*8.1E-13                        ! reaction R46
+<         RC53(JL)=ZFARR(1.E15,-8000.,ZTREC)                     ! reaction R47
+<         RC54(JL)=1.6E3                                         ! reaction R48
+<         RC57(JL)=(1.+IS(32,JK))*ZFARR(5.2E-12,504.,ZTREC)      ! reaction R49
+<         RC58(JL)=(1.+IS(33,JK))*ZFARR(4.33E-15,-1800.,ZTREC)   ! reaction R50
+<         RC59(JL)=(1.+IS(34,JK))*7.7E-15                        ! reaction R51
+---
+>         RC47(JL)=ZF3BOD(RX1,RX2)                       ! reaction R41
+>         RC48(JL)=ZFARR(2.0E16,-13500.,ZTREC)           ! reaction R42
+>         RC49(JL)=2.E-12                                ! reaction R44
+>         RC50(JL)=6.5E-12                               ! reaction R45
+>         RC52(JL)=8.1E-13                               ! reaction R46
+>         RC53(JL)=ZFARR(1.E15,-8000.,ZTREC)             ! reaction R47
+>         RC54(JL)=1.6E3                                 ! reaction R48
+>         RC57(JL)=ZFARR(5.2E-12,504.,ZTREC)             ! reaction R49
+>         RC58(JL)=ZFARR(4.33E-15,-1800.,ZTREC)          ! reaction R50
+>         RC59(JL)=7.7E-15                               ! reaction R51
+389,402c463,475
+<         RC61(JL)=(1.+IS(35,JK))*RX1/(1.+RX1/RX2)*
+<      *         0.6**(1./(1.+LOG10(RX1/RX2)**2))                ! reaction R52     
+<         RC62(JL)=(1.+IS(36,JK))*ZFARR(9.14E-15,-2580.,ZTREC)   ! reaction R53
+<         RC73(JL)=(1.+IS(37,JK))*1.7E-11                        ! reaction R54
+<         RC76(JL)=(1.+IS(38,JK))*ZFARR(2.54E-11,410.,ZTREC)     ! reaction R56
+<         RC77(JL)=(1.+IS(39,JK))*ZFARR(12.3E-15,-2013.,ZTREC)   ! reaction R57
+< 	RC78(JL)=(1.+IS(40,JK))*7.8E-13                        ! reaction R58
+<         RC79(JL)=(1.+IS(41,JK))*4.2E-12*EXP(180.*ZTREC)        ! reaction R63
+<         RC80(JL)=(1.+IS(42,JK))*ZFARR(1.7E-14,1300.,ZTREC)     ! reaction R64
+<         RC81(JL)=(1.+IS(43,JK))*6.8E-13                        ! reaction R65
+<         RC82(JL)=(1.+IS(44,JK))*3.5E-13*EXP(1000*ZTREC)        ! reaction R66
+<         RC83(JL)=(1.+IS(45,JK))*8.E-11                         ! reaction R68
+<         RC84(JL)=(1.+IS(46,JK))*1.78E-12                       ! reaction R61
+<         RC85(JL)=(1.+IS(47,JK))*RC81(JL)/RC79(JL)*RC82(JL)     ! reaction R67
+---
+>         RC61(JL)=RX1/(1.+RX1/RX2)*0.6**(1./(1.+LOG10(RX1/RX2)**2)) ! R52     
+>         RC62(JL)=ZFARR(9.14E-15,-2580.,ZTREC)          ! reaction R53
+>         RC73(JL)=1.7E-11                               ! reaction R54
+>         RC76(JL)=ZFARR(2.54E-11,410.,ZTREC)            ! reaction R56
+>         RC77(JL)=ZFARR(12.3E-15,-2013.,ZTREC)          ! reaction R57
+> 	RC78(JL)=7.8E-13                               ! reaction R58
+>         RC79(JL)=4.2E-12*EXP(180.*ZTREC)               ! reaction R63
+>         RC80(JL)=ZFARR(1.7E-14,1300.,ZTREC)            ! reaction R64
+>         RC81(JL)=6.8E-13                               ! reaction R65
+>         RC82(JL)=3.5E-13*EXP(1000*ZTREC)               ! reaction R66
+>         RC83(JL)=8.E-11                                ! reaction R68
+>         RC84(JL)=1.78E-12                              ! reaction R61
+>         RC85(JL)=RC81(JL)/RC79(JL)*RC82(JL)            ! reaction R67
+408,410c481,483
+<         ROHSO2(JL)=(1.+IS(48,JK))*ZF3BOD(RX1,RX2)
+<         ROHDMS(JL)=(1.+IS(49,JK))*ZFARR(1.2E-11,-260.,ZTREC)
+<         RNO3DMS(JL)=(1.+IS(50,JK))*ZFARR(1.9E-13,500.,ZTREC)
+---
+>         ROHSO2(JL)=ZF3BOD(RX1,RX2)
+>         ROHDMS(JL)=ZFARR(1.2E-11,-260.,ZTREC)
+>         RNO3DMS(JL)=ZFARR(1.9E-13,500.,ZTREC)
+413a487,495
+> C LG-   adding the reaction between isoprene and NO2 (might be important 
+> C       for nighttime destruction of isoprene within the canopy), see paper
+> C       of Brian Duncan
+> 
+>         RISOPNO2(JL)=1.5E-19
+> 
+> C LG-   end
+> 
+> 
+420,431c502,513
+<         IF (PPHOTCHEM(JL,JK,7).GT.1E-20) THEN
+<           RJH2O2(JL)=PPHOTCHEM(JL,JK,1)
+<           RJHNO3(JL)=PPHOTCHEM(JL,JK,2)
+<           RJNO2(JL)=PPHOTCHEM(JL,JK,3)
+<           RJN2O5(JL)=PPHOTCHEM(JL,JK,4)
+<           RJACH2O(JL)=PPHOTCHEM(JL,JK,5)
+<           RJBCH2O(JL)=PPHOTCHEM(JL,JK,6)
+<           RJO3D(JL)=PPHOTCHEM(JL,JK,7)
+<           RJMEPE(JL)=PPHOTCHEM(JL,JK,8)
+<           RJHNO4(JL)=PPHOTCHEM(JL,JK,9)
+<           RJANO3(JL)=PPHOTCHEM(JL,JK,10)
+<           RJBNO3(JL)=PPHOTCHEM(JL,JK,11)
+---
+>         IF (ZPPHOTCHEM(JL,JK,7).GT.1E-20) THEN
+>           RJH2O2(JL)=ZPPHOTCHEM(JL,JK,1)
+>           RJHNO3(JL)=ZPPHOTCHEM(JL,JK,2)
+>           RJNO2(JL)=ZPPHOTCHEM(JL,JK,3)
+>           RJN2O5(JL)=ZPPHOTCHEM(JL,JK,4)
+>           RJACH2O(JL)=ZPPHOTCHEM(JL,JK,5)
+>           RJBCH2O(JL)=ZPPHOTCHEM(JL,JK,6)
+>           RJO3D(JL)=ZPPHOTCHEM(JL,JK,7)
+>           RJMEPE(JL)=ZPPHOTCHEM(JL,JK,8)
+>           RJHNO4(JL)=ZPPHOTCHEM(JL,JK,9)
+>           RJANO3(JL)=ZPPHOTCHEM(JL,JK,10)
+>           RJBNO3(JL)=ZPPHOTCHEM(JL,JK,11)
+437a520
+> 
+438a522,528
+> 
+> C LG-     increased RJ organic nitrates
+> 
+> c          RJORGN(JL)=4.8*RJHNO3(JL)
+> 
+> C LG-     end
+> 
+469,489c559,591
+<         ZNOY0(JL)=PM(JL,JK,1)
+<         CH40(JL)=PM(JL,JK,3)
+<         O30(JL)=PM(JL,JK,2)
+<         CO0(JL)=PM(JL,JK,4)
+<         HNO30(JL)=PM(JL,JK,5)
+<         H2O20(JL)=PM(JL,JK,6)
+<         CH3O2H0(JL)=PM(JL,JK,7)
+<         DMS0(JL)=PM(JL,JK,8)
+<         SO20(JL)=PM(JL,JK,9)
+<         SAER0(JL)=PM(JL,JK,10)
+< 
+<         ZNO0(JL)=PM(JL,JK,25)
+<         ZNO20(JL)=PM(JL,JK,26)
+<         ZNO30(JL)=PM(JL,JK,27)
+<         ZN2O50(JL)=PM(JL,JK,28)
+<         HNO40(JL)=PM(JL,JK,29)
+< 
+<         OH0(JL)=PMLOC(JL,JK,1)
+<         HO20(JL)=PMLOC(JL,JK,2)
+<         CH3O20(JL)=PMLOC(JL,JK,6)
+<         CH2O0(JL)=PMLOC(JL,JK,7)
+---
+>         ZNOY0(JL)=ZPM(JL,JK,inox)
+>         CH40(JL)=ZPM(JL,JK,ich4)
+>         O30(JL)=ZPM(JL,JK,io3)
+>         CO0(JL)=ZPM(JL,JK,ico)
+>         HNO30(JL)=ZPM(JL,JK,ihno3)
+>         H2O20(JL)=ZPM(JL,JK,ih2o2)
+>         CH3O2H0(JL)=ZPM(JL,JK,ich3o2h)
+>         DMS0(JL)=ZPM(JL,JK,idms)
+>         SO20(JL)=ZPM(JL,JK,iso2)
+>         SAER0(JL)=ZPM(JL,JK,iso4)
+> 
+> C LG-   adding radon
+> 
+> 	RADON0(JL)=ZPM(JL,JK,irad)
+> 
+> C LG-   adding the hydrocarbons
+> 
+>         ROR0(JL)=ZPM(JL,JK,iror)
+>         XO20(JL)=ZPM(JL,JK,ixo2n)
+>         C2O30(JL)=ZPM(JL,JK,ic2o3)
+>         PAN0(JL)=ZPM(JL,JK,ipan)
+>         XO2N0(JL)=ZPM(JL,JK,ixo2n)
+>         ALD20(JL)=ZPM(JL,JK,iald2)
+>         ZMGLY0(JL)=ZPM(JL,JK,imgly)
+>         PAR0(JL)=ZPM(JL,JK,ipar)
+>         ETH0(JL)=ZPM(JL,JK,ieth)
+>         OLE0(JL)=ZPM(JL,JK,iole)
+>         ZISOP0(JL)=ZPM(JL,JK,iisop)
+>         ROOH0(JL)=ZPM(JL,JK,irooh)
+>         RXPAR0(JL)=ZPM(JL,JK,irxpar)
+>         ORGNTR0(JL)=ZPM(JL,JK,iorgntr)
+>         
+> C LG-   and the short lived species
+491c593,614
+< C LG- adding the hydrocarbons
+---
+>         IF (NTRAC.EQ.NTRACT) THEN
+>          ZNO0(JL)=ZPM(JL,JK,ino)
+>          ZNO20(JL)=ZPM(JL,JK,ino2)
+>          ZNO30(JL)=MAX(ZPM(JL,JK,ino3),1.E-30) ! to avoid potential numerical problems.
+>          ZN2O50(JL)=ZPM(JL,JK,in2o5)
+>          HNO40(JL)=ZPM(JL,JK,ihno4)
+>          OH0(JL)=ZPM(JL,JK,ioh)
+>          HO20(JL)=ZPM(JL,JK,iho2)
+>          CH3O20(JL)=ZPM(JL,JK,ich3o2)
+>          CH2O0(JL)=ZPM(JL,JK,ich2o)
+> 	ELSE
+>  	 ZNO0(JL)=ZPMLOC(JL,JK,ino)
+>          ZNO20(JL)=ZPMLOC(JL,JK,ino2)
+>          ZNO30(JL)=MAX(ZPMLOC(JL,JK,ino3),1.E-30) ! to avoid potential numerical problems.
+>          ZN2O50(JL)=ZPMLOC(JL,JK,in2o5)
+>          HNO40(JL)=ZPMLOC(JL,JK,ihno4)
+> 
+>          OH0(JL)=ZPMLOC(JL,JK,ioh)
+>          HO20(JL)=ZPMLOC(JL,JK,iho2)
+>          CH3O20(JL)=ZPMLOC(JL,JK,ich3o2)
+>          CH2O0(JL)=ZPMLOC(JL,JK,ich2o)
+>         ENDIF
+493,507d615
+<         ROR0(JL)=MAX(PM(JL,JK,11),1.E-30)
+<         XO20(JL)=MAX(PM(JL,JK,12),1.E-30)
+<         C2O30(JL)=MAX(PM(JL,JK,13),1.E-30)
+<         PAN0(JL)=MAX(PM(JL,JK,14),1.E-30)
+<         XO2N0(JL)=MAX(PM(JL,JK,15),1.E-30)
+<         ALD20(JL)=MAX(PM(JL,JK,16),1.E-30)
+<         ZMGLY0(JL)=MAX(PM(JL,JK,17),1.E-30)
+<         PAR0(JL)=MAX(PM(JL,JK,18),1.E-30)
+<         ETH0(JL)=MAX(PM(JL,JK,19),1.E-30)
+<         OLE0(JL)=MAX(PM(JL,JK,20),1.E-30)
+<         ZISOP0(JL)=MAX(PM(JL,JK,21),1.E-30) 
+<         ROOH0(JL)=MAX(PM(JL,JK,22),1.E-30)
+<         RXPAR0(JL)=MAX(PM(JL,JK,23),1.E-30)
+<         ORGNTR0(JL)=MAX(PM(JL,JK,24),1.E-30)
+<         
+511a620
+> 
+551d659
+< 	
+570a679
+> 
+573c682,683
+<       P1=RJBNO3(JL)*ZNO3(JL)       
+---
+>       P1=RJBNO3(JL)*ZNO3(JL)
+>      *   +0.2*RISOPNO2(JL)*ZISOP(JL)*ZNO2(JL) 	! isoprene + NO2       
+588c698,699
+<      *   +RC47(JL)*C2O3(JL)        
+---
+>      *   +RC47(JL)*C2O3(JL)
+>      *   +RISOPNO2(JL)*ZISOP(JL)	! isoprene + NO2        
+629c740,741
+<      *   *ZISOP(JL)*ZNO3(JL)       
+---
+>      *   *ZISOP(JL)*ZNO3(JL)
+>      *   +0.8*RISOPNO2(JL)*ZISOP(JL)*ZNO2(JL) 	! isoprene + NO2       
+711c823,824
+<      *   *ZNO3(JL)        
+---
+>      *   *ZNO3(JL) 
+>      *   +RISOPNO2(JL)*ZNO2(JL)		! isoprene + NO2       
+726c839,840
+<      *   +0.18*RC77(JL)*ZISOP(JL)*O3(JL)    
+---
+>      *   +0.18*RC77(JL)*ZISOP(JL)*O3(JL) 
+>      *   +RISOPNO2(JL)*ZISOP(JL)*ZNO2(JL)	! isoprene + NO2   
+735d848
+<       IF(MOD(ITER,2).EQ.0) THEN             
+740c853,854
+<      *   +RC41(JL)*CH2O(JL)*ZNO3(JL)        
+---
+>      *   +RC41(JL)*CH2O(JL)*ZNO3(JL)       
+>      *   +0.8*RISOPNO2(JL)*ZISOP(JL)*ZNO2(JL)	! isoprene + NO2 
+770c884,885
+<      *   *ZISOP(JL)*ZNO3(JL)       
+---
+>      *   *ZISOP(JL)*ZNO3(JL)
+>      *   +0.9*RISOPNO2(JL)*ZISOP(JL)*ZNO2(JL)	! isoprene + NO2       
+775a891
+>      *   +0.1*RISOPNO2(JL)*ZISOP(JL)*ZNO2(JL)	! isoprene + NO2
+794,795c910
+<       ENDIF               
+<       IF(MOD(ITER,MAXIT).EQ.0) THEN         
+---
+> 
+796a912
+> 
+809,810d924
+<       ENDIF               
+< 
+813,819c927,941
+<       XLSO2=ROHSO2(JL)*OH(JL)
+<       SO2(JL)=(SO20(JL)+(ROHDMS(JL)*OH(JL)+
+<      *  RNO3DMS(JL)*ZNO3(JL))*DMS(JL)*DT)/(1.+XLSO2*DT)
+<       PSAER=ROHSO2(JL)*OH(JL)*SO2(JL)
+<       SAER(JL)=SAER0(JL)+PSAER*DT
+<       XLDMS=ROHDMS(JL)*OH(JL)+RNO3DMS(JL)*ZNO3(JL)
+<       DMS(JL)=DMS0(JL)/(1.+XLDMS*DT)
+---
+>       IF (LSULFCHEM) THEN
+>           XLSO2=ROHSO2(JL)*OH(JL)
+>        SO2(JL)=(SO20(JL)+(ROHDMS(JL)*OH(JL)+
+>      *   RNO3DMS(JL)*ZNO3(JL))*DMS(JL)*DT)/(1.+XLSO2*DT)
+>           PSAER=ROHSO2(JL)*OH(JL)*SO2(JL)
+>        SAER(JL)=SAER0(JL)+PSAER*DT
+>           XLDMS=ROHDMS(JL)*OH(JL)+RNO3DMS(JL)*ZNO3(JL)
+>        DMS(JL)=DMS0(JL)/(1.+XLDMS*DT)
+>       ELSE
+>        SO2(JL)=SO20(JL)
+>        SAER(JL)=SAER0(JL)
+>        DMS(JL)=DMS0(JL)
+>       ENDIF
+> 
+> C LG- end
+828c950
+<       IF (ABS((NEWNOY-OLDNOY)/NEWNOY).LT.1.E-15.OR.ITER.GT.100) 
+---
+>       IF (ABS((NEWNOY-OLDNOY)/NEWNOY).LT.1.E-15.OR.ITER.GT.250) 
+834a957,965
+> 
+> C LG- radon decay, Radioactive decay of 222^Ra; life time of 5.5 day
+> 
+>       RSP_LTIME=1./(5.5*86400.)
+>       RADON(JL)=RADON0(JL)*EXP(-PTMST*RSP_LTIME)
+> 
+> C LG- end
+> 
+> 
+856,857c987,988
+<         TOTN(JL)=ZNO(JL)+ZNO2(JL)+ZNO3(JL)+2*ZN2O5(JL)+HNO4(JL)
+<      *      +HNO3(JL)+PAN(JL)+ORGNTR(JL)
+---
+>         TOTN(JL)=ZNO(JL)+ZNO2(JL)+ZNO3(JL)+2*ZN2O5(JL)
+>      *   +HNO4(JL)+PAN(JL)+HNO3(JL)+ORGNTR(JL)
+863,896c994,1042
+< 	
+< 	PM(JL,JK,2)=O3(JL)
+<         PM(JL,JK,3)=CH4(JL)
+<         PM(JL,JK,4)=CO(JL)
+<         PM(JL,JK,5)=HNO3(JL)-DIFFN*(HNO3(JL)/TOTN(JL)) 
+< 	PM(JL,JK,6)=H2O2(JL)    
+<         PM(JL,JK,7)=CH3O2H(JL)
+<         PM(JL,JK,8)=DMS(JL)
+<         PM(JL,JK,9)=SO2(JL)
+<         PM(JL,JK,10)=SAER(JL)
+<         PM(JL,JK,11)=ROR(JL)
+<         PM(JL,JK,12)=XO2(JL)
+<         PM(JL,JK,13)=C2O3(JL)
+<         PM(JL,JK,14)=PAN(JL)-DIFFN*(PAN(JL)/TOTN(JL))    
+<         PM(JL,JK,15)=XO2N(JL)
+<         PM(JL,JK,16)=ALD2(JL)
+<         PM(JL,JK,17)=ZMGLY(JL)
+<         PM(JL,JK,18)=PAR(JL)
+<         PM(JL,JK,19)=ETH(JL)
+<         PM(JL,JK,20)=OLE(JL)
+<         PM(JL,JK,21)=ZISOP(JL)
+<         PM(JL,JK,22)=ROOH(JL) 
+<         PM(JL,JK,23)=RXPAR(JL)
+<         PM(JL,JK,24)=ORGNTR(JL)-DIFFN*(ORGNTR(JL)/TOTN(JL))    
+<         PM(JL,JK,25)=ZNO(JL)-DIFFN*(ZNO(JL)/TOTN(JL))
+<         PM(JL,JK,26)=ZNO2(JL)-DIFFN*(ZNO2(JL)/TOTN(JL))
+<         PM(JL,JK,27)=ZNO3(JL)-DIFFN*(ZNO3(JL)/TOTN(JL))
+<         PM(JL,JK,28)=ZN2O5(JL)-DIFFN*(2*ZN2O5(JL)/TOTN(JL))
+<         PM(JL,JK,29)=HNO4(JL)-DIFFN*(HNO4(JL)/TOTN(JL))
+< 
+<         PMLOC(JL,JK,1)=OH(JL)
+<         PMLOC(JL,JK,2)=HO2(JL)
+<         PMLOC(JL,JK,6)=CH3O2(JL)
+<         PMLOC(JL,JK,7)=CH2O(JL)
+---
+> 
+>         IF (ABS(DIFFN/TOTN(JL)).GT.1E-5) THEN
+> 	 WRITE(*,'(1a)')' STOP called in CBM4_TM3 since there is too ', 
+>      &     'mass conservation of odd-N'
+>          WRITE(*,'(1a,i3)')' Level: ',jk
+> 	 WRITE(*,'(1a,i4)')' Number of required interations: ',iter
+> 	 WRITE(*,'(1a,1e10.3)')' Relative mass loss: ',DIFFN/TOTN(JL)
+>          WRITE(*,'(1a)')' Enter to finish simulation'
+> 	 READ (*,*)
+> 	 STOP
+> 	ENDIF
+> 
+> 	ZPM(JL,JK,io3)=O3(JL)
+>         ZPM(JL,JK,ich4)=CH4(JL)
+>         ZPM(JL,JK,ico)=CO(JL)
+>         ZPM(JL,JK,ihno3)=HNO3(JL)-DIFFN*(HNO3(JL)/TOTN(JL)) 
+> 	ZPM(JL,JK,ih2o2)=H2O2(JL)    
+>         ZPM(JL,JK,ich3o2h)=CH3O2H(JL)
+>         ZPM(JL,JK,idms)=DMS(JL)
+>         ZPM(JL,JK,iso2)=SO2(JL)
+>         ZPM(JL,JK,iso4)=SAER(JL)
+>         ZPM(JL,JK,iror)=ROR(JL)
+>         ZPM(JL,JK,ixo2)=XO2(JL)
+>         ZPM(JL,JK,ic2o3)=C2O3(JL)
+>         ZPM(JL,JK,ipan)=PAN(JL)-DIFFN*(PAN(JL)/TOTN(JL))    
+>         ZPM(JL,JK,ixo2n)=XO2N(JL)
+>         ZPM(JL,JK,iald2)=ALD2(JL)
+>         ZPM(JL,JK,imgly)=ZMGLY(JL)
+>         ZPM(JL,JK,ipar)=PAR(JL)
+>         ZPM(JL,JK,ieth)=ETH(JL)
+>         ZPM(JL,JK,iole)=OLE(JL)
+>         ZPM(JL,JK,iisop)=ZISOP(JL)
+>         ZPM(JL,JK,irooh)=ROOH(JL) 
+>         ZPM(JL,JK,irxpar)=RXPAR(JL)
+>         ZPM(JL,JK,iorgntr)=ORGNTR(JL)-DIFFN*(ORGNTR(JL)/TOTN(JL))    
+> 	ZPM(JL,JK,irad)=RADON(JL)
+> 
+>         IF (NTRAC.EQ.NTRACT) THEN
+>          ZPM(JL,JK,ino)=ZNO(JL)-DIFFN*(ZNO(JL)/TOTN(JL))
+>          ZPM(JL,JK,ino2)=ZNO2(JL)-DIFFN*(ZNO2(JL)/TOTN(JL))
+>          ZPM(JL,JK,ino3)=ZNO3(JL)-DIFFN*(ZNO3(JL)/TOTN(JL))
+>          ZPM(JL,JK,in2o5)=ZN2O5(JL)-DIFFN*(2*ZN2O5(JL)/TOTN(JL))
+>          ZPM(JL,JK,ihno4)=HNO4(JL)-DIFFN*(HNO4(JL)/TOTN(JL))
+> 
+>          ZPM(JL,JK,ioh)=OH(JL)
+>          ZPM(JL,JK,iho2)=HO2(JL)
+>          ZPM(JL,JK,ich3o2)=CH3O2(JL)
+>          ZPM(JL,JK,ich2o)=CH2O(JL)
+> 	 ZPM(JL,JK,irad)=RADON(JL)
+900,901c1046,1065
+< 	PM(JL,JK,1)=PM(JL,JK,25)+PM(JL,JK,26)+PM(JL,JK,27)
+<      *              +PM(JL,JK,28)+PM(JL,JK,29)
+---
+> 	 ZPM(JL,JK,inox)=ZPM(JL,JK,ino)+ZPM(JL,JK,ino2)+ZPM(JL,JK,ino3)
+>      *              +ZPM(JL,JK,in2o5)+ZPM(JL,JK,ihno4)
+>         ELSE
+> 	 ZPMLOC(JL,JK,ino)=ZNO(JL)-DIFFN*(ZNO(JL)/TOTN(JL))
+>          ZPMLOC(JL,JK,ino2)=ZNO2(JL)-DIFFN*(ZNO2(JL)/TOTN(JL))
+>          ZPMLOC(JL,JK,ino3)=ZNO3(JL)-DIFFN*(ZNO3(JL)/TOTN(JL))
+>          ZPMLOC(JL,JK,in2o5)=ZN2O5(JL)-DIFFN*(2*ZN2O5(JL)/TOTN(JL))
+>          ZPMLOC(JL,JK,ihno4)=HNO4(JL)-DIFFN*(HNO4(JL)/TOTN(JL))
+> 
+>          ZPMLOC(JL,JK,ioh)=OH(JL)
+>          ZPMLOC(JL,JK,iho2)=HO2(JL)
+>          ZPMLOC(JL,JK,ich3o2)=CH3O2(JL)
+>          ZPMLOC(JL,JK,ich2o)=CH2O(JL)
+> 
+> C WP--   NOy is calculated after the mass correction has been done.
+> 
+> 	 ZPM(JL,JK,inox)=ZPMLOC(JL,JK,ino)+ZPMLOC(JL,JK,ino2)+
+>      *       ZPMLOC(JL,JK,ino3)+ZPMLOC(JL,JK,in2o5)+ZPMLOC(JL,JK,ihno4)
+> 
+>         ENDIF
+908a1073,1077
+> C LG- not considering the concentrations at zz for budgets and
+> C     and other I/O
+> 
+>       IF (LXTMZZ.AND.JK.EQ.NLEVEL+1) GOTO 101
+> 
+914,915d1082
+< C ACP-if covariance paramterization is used: half the tendency should be stored
+<         IF (LCOVAR) ZFAC=0.5*ZFAC
+956,958d1122
+< 	BRX(IW,40)=BRX(IW,40)+DMS(JL)*OH(JL)*ROHDMS(JL)*ZFAC
+< 	BRX(IW,41)=BRX(IW,41)+DMS(JL)*ZNO3(JL)*RNO3DMS(JL)*ZFAC
+< 	BRX(IW,42)=BRX(IW,42)+SO2(JL)*OH(JL)*ROHSO2(JL)*ZFAC
+960c1124,1132
+<   107 CONTINUE
+---
+> C LG-   sulfur chemistry
+> 
+>         IF (LSULFCHEM) THEN
+> 
+>          BRX(IW,40)=BRX(IW,40)+DMS(JL)*OH(JL)*ROHDMS(JL)*ZFAC
+>          BRX(IW,41)=BRX(IW,41)+DMS(JL)*ZNO3(JL)*RNO3DMS(JL)*ZFAC
+>          BRX(IW,42)=BRX(IW,42)+SO2(JL)*OH(JL)*ROHSO2(JL)*ZFAC
+> 
+>         ENDIF
+961a1134,1329
+> C LG-   end
+> 
+> C WP-   calculation of the Ozone Producing Potential for all levels.
+> C       The ozone producing potential is a linear estimate of the ozone
+> C       production/loss due to chemistry. It represents all the reactions
+> C       that disturb the fast photochemical equilibrium between NO2/NO and O3.
+> C       It is a multiplication of species Y, the rate constant K and the [O3].
+> C       This gives an estimate of P(O3) in molec cm-3 s-1.
+> C       The fast chemical equilibrium with NO2 is not included, and neither is
+> C       the formation of reservoir species, since these reactions are reversible 
+> C       in time. 
+> 
+>         IF (NSTEP.EQ.0.AND.JK.EQ.KTHEIGHT) THEN
+> 
+> C LG-     opening files for chemical production/destruction of O3 and
+> C         some other trace gases
+> 
+>           OPEN(UNIT=NUNREAC,FILE='/data/ganzevl/racmo/output/reaction.out',STATUS='UNKNOWN')
+> 
+>           WRITE(NUNREAC,'(2a)')
+>      &      'Chemical production and destruction terms for a selection ',
+>      &      'of trace gases'
+> 	  WRITE(NUNREAC,*)NSTOP,PTMST,NPRINT,NLEVEL
+> 
+>           IF (LBIOSPH.AND.LAGRIAN) THEN
+> 	   WRITE (NUNREAC,*)  (PZ(JL,JJK),JJK=NLEVEL,1,-1)
+> 	  ELSE 
+> 	   WRITE (NUNREAC,*)  (HGHT(JJK),JJK=NLEVEL,1,-1)
+>           ENDIF
+> 
+> C LG-     writing of the different reaction/photolysis rates numbers/names as 
+> C         they are defined in the parameter list of the hydrocarbon chemistry code
+> C         so that the different reactions can be coupled to the proper reaction
+> C         names, this list must resemble that of the listed reactions in the 
+> C         write statement of the actual prodcution/destruction terms,
+> C         the photolysis rates numbers all start with an j** whereas the reaction
+> C         rate numbers all start with with nr**** (since r*** is already used
+> C         for the reaction rates as a function of the longitude)
+> 
+>           NTRAC_OUT=2
+> 	  NREACTION(io3)=10
+> 	  NREACTION(ich2o)=20
+> 
+> 	  WRITE(NUNREAC,'(3i4)')ICHEMTYPE,NTRAC,NTRAC_OUT
+> 	  WRITE(NUNREAC,'(50i4)')IO3,ICH2O
+>           WRITE(NUNREAC,'(50i4)')NREACTION(io3),NREACTION(ich2o)
+> 
+> C LG-     writing the reaction/photodissociation numbers which are defined
+> C         in the parameter file parreact.h and are used to define the legends in
+> C         IDL scripts by coupling these numbers (positive for photodiss., and
+> C         negative for reaction rates) to three characterstrings in the IDL
+> C         scripts.
+> 
+> C LG-     ozone
+> 
+> 	  WRITE(NUNREAC,'(100i4)')NRHO2NO,NRMO2NO,
+>      $        NRC46,NRC79,NRO3OH,NRO3HO2,NRC58,NRC62,NRC77,NRH2OOD
+> 
+> C LG-     formaldehyde
+> 
+> 	  WRITE(NUNREAC,'(100i4)')NRC46,NROHMPER,NRMO2NO,NRMO2MO2,JMEPE,
+>      $        NRC49,NRC50,J45,NRC57,NRC58,NRC59,NRC61,NRC62,NRC76,NRC77,
+>      $        NRC78,JACH2O,JBCH2O,NRFRMOH,NRC41
+> 
+> C LG-     end
+> 
+>         ENDIF 
+>     	
+> C WP-   writing with frequency nprint, to file NUNOPP (see sunit.f and 1d)
+> 
+>         IF(MOD(NSTEP,NPRINT).EQ.0) THEN
+> 
+>          IF (JK.EQ.KTHEIGHT) THEN
+>           WRITE(NUNREAC,*)NSTEP,JDAY,GMT,LTIME,HC,TRPHGT,PBLHGT,
+>      *                    KTHEIGHT
+>          ENDIF
+> 
+>          IF (NTRAC.EQ.NTRACT) THEN
+> 
+> C WP-    O1d is needed for an estimate of the loss reaction h2o+o1d
+> 	
+>          O1D=ZPM(JL,JK,2)*ZPPHOTCHEM(JL,JK,7)/(RODM(JL)*AIR(JL))	
+>        
+> C WP-    Ozone Producing Potential calculation
+> 
+>          OPP(JK)=RHO2NO(JL)*ZPM(JL,JK,ino)*ZPM(JL,JK,iho2)+     ! conv. of NO2
+>      *    ZPM(JL,JK,ino)*(RMO2NO(JL)*ZPM(JL,JK,ich3o2)+        	! conv. of NO2
+>      *    RC46(JL)*ZPM(JL,JK,ic2o3)+RC79(JL)*ZPM(JL,JK,ixo2))-  ! conv. of NO2
+>      *    ZPM(JL,JK,io3)*(RO3OH(JL)*ZPM(JL,JK,ioh)+RO3HO2(JL)*  ! loss of O3
+>      *    ZPM(JL,JK,iho2)+RC58(JL)*ZPM(JL,JK,iole)+RC62(JL)*  	! loss of O3
+>      *    ZPM(JL,JK,ieth)+RC77(JL)*ZPM(JL,JK,iisop))-
+>      *    RH2OOD(JL)*H2O(JL)*O1D                          	! loss of o3
+> 
+>          WRITE(NUNREAC,*)          
+>      *         NSTEP,JK,ZPRHOA(JL,JK), 
+>      * 	       ZPM(JL,JK,ino)*RHO2NO(JL)*ZPM(JL,JK,iho2),	!,'NO+HO2'
+>      * 	       ZPM(JL,JK,ino)*RMO2NO(JL)*ZPM(JL,JK,ich3o2),	!,'NO+CH3O2'
+>      *	       ZPM(JL,JK,ino)*RC46(JL)*ZPM(JL,JK,ic2o3),	!,'NO+C2O3'
+>      * 	       ZPM(JL,JK,ino)*RC79(JL)*ZPM(JL,JK,ixo2),		!,'NO+XO2'
+>      * 	       -ZPM(JL,JK,io3)*RO3OH(JL)*ZPM(JL,JK,ioh),	!,'O3+OH'
+>      * 	       -ZPM(JL,JK,io3)*RO3HO2(JL)*ZPM(JL,JK,iho2),	!,'O3+HO2'
+>      * 	       -ZPM(JL,JK,io3)*RC58(JL)*ZPM(JL,JK,iole),	!,'O3+OLE'
+>      * 	       -ZPM(JL,JK,io3)*RC62(JL)*ZPM(JL,JK,ieth),	!,'O3+ETH'
+>      * 	       -ZPM(JL,JK,io3)*RC77(JL)*ZPM(JL,JK,iisop),	!,'O3+ISOP'
+>      * 	       -RH2OOD(JL)*H2O(JL)*O1D				!,'H2O+O1D'
+> 
+> C LG-    production terms of formaldehyde
+> 
+>          WRITE(NUNREAC,*),
+>      *          RC46(JL)*ZPM(JL,JK,ic2o3)*ZPM(JL,JK,ino),
+>      *          0.3*ROHMPER(JL)*ZPM(JL,JK,ich3o2h)*ZPM(JL,JK,ioh),
+>      *          RMO2NO(JL)*ZPM(JL,JK,ich3o2)*ZPM(JL,JK,ino),      
+>      *          1.33*RMO2MO2(JL)*ZPM(JL,JK,ich3o)*ZPM(JL,JK,ich3o),
+>      *          RJMEPE(JL)*ZPM(JL,JK,ich3o2h),
+>      *          2.*RC49(JL)*ZPM(JL,JK,ic2o3)*ZPM(JL,JK,ic2o3),   
+>      *          RC50(JL)*ZPM(JL,JK,ic2o3)*ZPM(JL,JK,iho2),
+>      *          RJ45(JL)*ZPM(JL,JK,iald2),         
+>      *          RC57(JL)*ZPM(JL,JK,iole)*ZPM(JL,JK,ioh),
+>      *          0.64*RC58(JL)*ZPM(JL,JK,iole)*ZPM(JL,JK,io3),
+>      *          RC59(JL)*ZPM(JL,JK,iole)*ZPM(JL,JK,ino3),
+>      *          1.56*RC61(JL)*ZPM(JL,JK,ieth)*ZPM(JL,JK,ioh),
+>      *          RC62(JL)*ZPM(JL,JK,ieth)*ZPM(JL,JK,io3),     
+>      *          0.61*RC76(JL)*ZPM(JL,JK,iisop)*ZPM(JL,JK,ioh),
+>      *          0.9*RC77(JL)*ZPM(JL,JK,iisop)*ZPM(JL,JK,io3),
+>      *          0.03*RC78(JL)*ZPM(JL,JK,iisop)*ZPM(JL,JK,ino3),
+>                        
+> C LG-   and destruction terms
+> 
+>      *          -ZPM(JL,JK,ich2o)*RJACH2O(JL),
+>      *          -ZPM(JL,JK,ich2o)*RJBCH2O(JL),
+>      *          -ZPM(JL,JK,ich2o)*ZPM(JL,JK,ioh)*RFRMOH(JL),        
+>      *          -ZPM(JL,JK,ich2o)*RC41(JL)*ZPM(JL,JK,ino3)
+> 
+>          ELSE
+> 
+> C WP-    O1d is needed for an estimate of the loss reaction h2o+o1d
+> 	
+>          O1D=ZPM(JL,JK,2)*ZPPHOTCHEM(JL,JK,7)/(RODM(JL)*AIR(JL))	
+>        
+> C WP-    Ozone Producing Potential calculation
+> 
+>          OPP(JK)=RHO2NO(JL)*ZPMLOC(JL,JK,ino)*ZPM(JL,JK,iho2)+	! conv. of NO2
+>      *    ZPMLOC(JL,JK,ino)*(RMO2NO(JL)*ZPMLOC(JL,JK,ich3o2)+	! conv. of NO2
+>      *    RC46(JL)*ZPM(JL,JK,ic2o3)+RC79(JL)*ZPM(JL,JK,ixo2))-  ! conv. of NO2
+>      *    ZPM(JL,JK,io3)*(RO3OH(JL)*ZPMLOC(JL,JK,ioh)+RO3HO2(JL)*  ! loss of O3
+>      *    ZPMLOC(JL,JK,iho2)+RC58(JL)*ZPM(JL,JK,iole)+RC62(JL)*	! loss of O3
+>      *    ZPM(JL,JK,ieth)+RC77(JL)*ZPM(JL,JK,iisop))-
+>      *    RH2OOD(JL)*H2O(JL)*O1D                          	! loss of o3
+> 
+>          WRITE(NUNREAC,*)          
+>      *   		NSTEP,JK,ZPRHOA(JL,JK), 
+>      * 	ZPMLOC(JL,JK,ino)*RHO2NO(JL)*ZPMLOC(JL,JK,iho2),	!,'NO+HO2'
+>      * 	ZPMLOC(JL,JK,ino)*RMO2NO(JL)*ZPMLOC(JL,JK,ich3o2),	!,'NO+CH3O2'
+>      *	ZPMLOC(JL,JK,ino)*RC46(JL)*ZPM(JL,JK,ic2o3),		!,'NO+C2O3'
+>      *	ZPMLOC(JL,JK,ino)*RC79(JL)*ZPM(JL,JK,ixo2),		!,'NO+XO2'
+>      *	-ZPM(JL,JK,io3)*RO3OH(JL)*ZPMLOC(JL,JK,ioh),		!,'O3+OH'
+>      * 	-ZPM(JL,JK,io3)*RO3HO2(JL)*ZPMLOC(JL,JK,iho2),		!,'O3+HO2'
+>      *	-ZPM(JL,JK,io3)*RC58(JL)*ZPM(JL,JK,iole),		!,'O3+OLE'
+>      * 	-ZPM(JL,JK,io3)*RC62(JL)*ZPM(JL,JK,ieth),		!,'O3+ETH'
+>      *	-ZPM(JL,JK,io3)*RC77(JL)*ZPM(JL,JK,iisop),		!,'O3+ISOP'
+>      *	 -RH2OOD(JL)*H2O(JL)*O1D				!,'H2O+O1D'
+> 
+> C LG-    production terms of formaldehyde
+> 
+>          WRITE(NUNREAC,*),
+>      *          RC46(JL)*ZPM(JL,JK,ic2o3)*ZPMLOC(JL,JK,ino),
+>      *          0.3*ROHMPER(JL)*ZPM(JL,JK,ich3o2h)*ZPMLOC(JL,JK,ioh),
+>      *          RMO2NO(JL)*ZPMLOC(JL,JK,ich3o2)*ZPMLOC(JL,JK,ino),      
+>      *          1.33*RMO2MO2(JL)*ZPMLOC(JL,JK,ich3o)*ZPMLOC(JL,JK,ich3o),
+>      *          RJMEPE(JL)*ZPM(JL,JK,ich3o2h),
+>      *          2.*RC49(JL)*ZPM(JL,JK,ic2o3)*ZPM(JL,JK,ic2o3),   
+>      *          RC50(JL)*ZPM(JL,JK,ic2o3)*ZPMLOC(JL,JK,iho2),
+>      *          RJ45(JL)*ZPM(JL,JK,iald2),         
+>      *          RC57(JL)*ZPM(JL,JK,iole)*ZPMLOC(JL,JK,ioh),
+>      *          0.64*RC58(JL)*ZPM(JL,JK,iole)*ZPM(JL,JK,io3),
+>      *          RC59(JL)*ZPM(JL,JK,iole)*ZPMLOC(JL,JK,ino3),
+>      *          1.56*RC61(JL)*ZPM(JL,JK,ieth)*ZPMLOC(JL,JK,ioh),
+>      *          RC62(JL)*ZPM(JL,JK,ieth)*ZPM(JL,JK,io3),     
+>      *          0.61*RC76(JL)*ZPM(JL,JK,iisop)*ZPMLOC(JL,JK,ioh),
+>      *          0.9*RC77(JL)*ZPM(JL,JK,iisop)*ZPM(JL,JK,io3),
+>      *          0.03*RC78(JL)*ZPM(JL,JK,iisop)*ZPMLOC(JL,JK,ino3),
+>                        
+> C LG-    and destruction terms
+> 
+>      *          -ZPMLOC(JL,JK,ich2o)*RJACH2O(JL),
+>      *          -ZPMLOC(JL,JK,ich2o)*RJBCH2O(JL),
+>      *          -ZPMLOC(JL,JK,ich2o)*ZPMLOC(JL,JK,ioh)*RFRMOH(JL),        
+>      *          -ZPMLOC(JL,JK,ich2o)*RC41(JL)*ZPMLOC(JL,JK,ino3)
+>            
+>          ENDIF
+> 
+>        ENDIF
+> 
+> C LG-  end
+> 
+>   107 CONTINUE
+964a1333,1372
+>       IF (NSTEP.EQ.NSTOP) CLOSE(NUNREAC)
+> 
+> C LG- assigning the calculated values for the different levels to the 
+> C     proper array names
+> 
+>       DO 200 JK=1,NLEVEL+DLEVEL
+>       DO 200 JL=1,NLON
+> 
+> C LG- assigning the tracer concentrations
+> 
+>        DO JT=1,NTRAC
+> 	 IF(LBULKVEG.AND.JK.EQ.NLEV+1) THEN
+>      	   PM(JL,JK,JT)=ZPM(JL,JK,JT)
+> 	 ELSEIF(LVEG_MLAY.AND.JK.GE.NLEV+1.AND.JK.LT.NLEVEL+1) THEN
+>      	   PM(JL,JK,JT)=ZPM(JL,JK,JT)
+>          ELSEIF (LXTMZZ.AND.JK.EQ.NLEVEL+1) THEN
+>            PMZZ(JL,JT)=ZPM(JL,JK,JT)
+> 	 ELSE
+> 	   PM(JL,JK,JT)=ZPM(JL,JK,JT)
+> 	 ENDIF
+>        ENDDO
+> 
+> C LG-  and the short lived species
+> 
+>        DO JG=1,KG3X
+> 	 IF(LBULKVEG.AND.JK.EQ.NLEV+1) THEN
+>      	   PMLOC(JL,JK,JG)=ZPMLOC(JL,JK,JG)
+> 	 ELSEIF(LVEG_MLAY.AND.JK.GE.NLEV+1.AND.JK.LT.NLEVEL+1) THEN
+>      	   PMLOC(JL,JK,JG)=ZPMLOC(JL,JK,JG)
+>          ELSEIF (LXTMZZ.AND.JK.EQ.NLEVEL+1) THEN
+>            PMZZ(JL,JG+NTRAC)=ZPMLOC(JL,JK,JG)
+> 	 ELSE
+> 	   PMLOC(JL,JK,JG)=ZPMLOC(JL,JK,JG)
+> 	 ENDIF
+>        ENDDO
+> 
+>  200  CONTINUE
+> 
+> C LG- end
+> 
+967a1376
+> 
+971c1380,1386
+<         DPM(JL,JK,JT)=(PM(JL,JK,JT)+DPM(JL,JK,JT))*GRVOL(JL,JK)
+---
+> 	IF(LBULKVEG.AND.JK.EQ.NLEV+1) THEN
+>          DPM(JL,JK,JT)=(PM(JL,JK,JT)+DPM(JL,JK,JT))*GRVOL(JL,JK)
+> 	ELSEIF(LVEG_MLAY.AND.JK.GE.NLEV+1) THEN
+>          DPM(JL,JK,JT)=(PM(JL,JK,JT)+DPM(JL,JK,JT))*GRVOL(JL,JK)
+>         ELSE
+>          DPM(JL,JK,JT)=(PM(JL,JK,JT)+DPM(JL,JK,JT))*GRVOL(JL,JK)
+>  	ENDIF
+972a1388
+> 
+976,977c1392,1401
+<         DPMLOC(JL,JK,JG)=(PMLOC(JL,JK,JG)+DPMLOC(JL,JK,JG))
+<      *                *GRVOL(JL,JK)
+---
+> 	IF(LBULKVEG.AND.JK.EQ.NLEV+1) THEN
+>          DPMLOC(JL,JK,JG)=(PMLOC(JL,JK,JG)+DPMLOC(JL,JK,JG))*
+>      &                     GRVOL(JL,JK)
+> 	ELSEIF(LVEG_MLAY.AND.JK.GE.NLEV+1) THEN
+>          DPMLOC(JL,JK,JG)=(PMLOC(JL,JK,JG)+DPMLOC(JL,JK,JG))*
+>      &                     GRVOL(JL,JK)
+>         ELSE
+>          DPMLOC(JL,JK,JG)=(PMLOC(JL,JK,JG)+DPMLOC(JL,JK,JG))*
+>      &                     GRVOL(JL,JK)
+> 	ENDIF
+980c1404
+<       CALL BUDCALC(NLEV,NLEVEL,DPM,DPMLOC,KG3X,2)
+---
+>       CALL BUDCALC(NLEV,NLEVEL,DPM,DPMLOC,KG3X,IBCHEM)
+984c1408
+<       WRITE(NUNMDFL,*)'End calculation of chemistry'
+---
+>       WRITE(NUNMDFL,*)'End CBM4_TM3.f'

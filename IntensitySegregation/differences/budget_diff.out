@@ -1,0 +1,438 @@
+1,2c1,3
+<       SUBROUTINE BUDGET (NSTOP,DTIME,NSTEP,NLEV,NLEVEL,PM,PMLOC,
+<      *                   ZRHOA,ZP,Z,ZDZ,KG3X,IS,IBS,ISHOR,ISBULK)
+---
+>       SUBROUTINE BUDGET (NSTOP,DTIME,NSTEP,NLEV,NLEVEL,
+>      &                   KG3X,IS,IBS,AREA,PM,PMLOC,PXTM1,
+>      &                   PXTMVEG,PXTMSN,ZRHOA,ZP,Z)
+16,17c17,18
+<       INTEGER KG3X,JT,JK,NLEV,JL,IW,NSTEP,IS,IBS,NRESUM,NSTOP,
+<      *        NLEV1,NLEV2,NLEVPR,NLEVEL,IDAY,JJ,I
+---
+>       INTEGER KG3X,JT,JK,JJK,NLEV,JL,IW,NSTEP,IS,IBS,NSTOP,
+>      *        NLEV1,NLEV2,NLEVPR,NLEVEL,IDAY,J,JJ
+20c21,22
+<      *     PMLOCBULK(KG3X),
+---
+>      *   PXTM1(NLON,NLEVT,NTRAC),PXTMVEG(NLON,NLEVV_ML,NTRAC),
+>      *   PXTMSN(NLON,NLEVS_ML,NTRAC),
+22,26c24
+<      *   ZRHOA(NLON,NLEVT),ZP(NLON,NLEVT),Z(NLON,NLEVT),ZDZ(NLON,NLEVT)
+< 
+< C ACP-
+<       REAL ISHOR(NBINREAC,NLEVT),ISBULK(NBINREAC)
+< C ACP-end
+---
+>      *   ZRHOA(NLON,NLEVT),ZP(NLON,NLEVT),Z(NLON,NLEVT)
+30,31c28,29
+<       REAL ZPM(NLON,NLEVT,NTRAC),DH,DZ
+<       REAL ZPMBULK(NTRAC)
+---
+>       REAL ZPM(NLON,NLEVT,NTRAC),ZPMLOC(NLON,NLEVT,NG3X),
+>      *     DH,DZ,AREA,TOTMASS,TOTVOL,RECALC
+54c52
+<      *  OPEN(UNIT=NUNBUD,FILE='budget.out',STATUS='UNKNOWN')
+---
+>      *  OPEN(UNIT=NUNBUD,FILE='/data/ganzevl/racmo/output/budget.out',STATUS='UNKNOWN')
+65a64,65
+> 
+>          JJK=JK-NLEV
+67c67,97
+<          PMTB(IW,JT)=PMTB(IW,JT)
+---
+> 
+> C LG-    the first timestep, not the parameters PM is accumulated
+> C        but the parameter PXTM1/PXTMVEG which represents the intial profiles 
+> C        whereas PM is already updated for all the considered processes 
+> C        during the first timestep, the budgets for the first timestep are 
+> C        calculated from the product of PXTM1/PXTMVEG in molecules g-1 and
+> C        the grid mass in g, whereas for the parameters PM in 
+> C        molecules cm-3, the volume must be considered 
+> 
+>          IF (NSTEP.EQ.0) THEN
+> 	  IF (LBULKVEG.OR.LVEG_MLAY.AND.JK.GT.NLEV) THEN
+> 	   JJK=JK-NLEV
+>            PMTB(IW,JT)=PMTB(IW,JT)
+>      *      +PXTMVEG(JL,JJK,JT)*(VEGFRAC(JL)+WSFRAC(JL))*GRMASS(JL,JK)
+> 	  ELSEIF (LSNOW_MLAY.AND.JK.GT.NLEV) THEN
+> 	   JJK=JK-NLEV
+>            PMTB(IW,JT)=PMTB(IW,JT)
+>      *      +PXTMSN(JL,JJK,JT)*(SNFRAC(JL))*GRMASS(JL,JK)
+>           ELSE
+> 	   PMTB(IW,JT)=PMTB(IW,JT)
+>      *      +PXTM1(JL,JK,JT)*GRMASS(JL,JK)
+>           ENDIF
+> 	 ELSE
+>      	  IF (LBULKVEG.OR.LVEG_MLAY.AND.JK.GT.NLEV) THEN
+>            PMTB(IW,JT)=PMTB(IW,JT)
+>      *      +PM(JL,JK,JT)*(VEGFRAC(JL)+WSFRAC(JL))*GRVOL(JL,JK)
+>      	  ELSEIF (LSNOW_MLAY.AND.JK.GT.NLEV) THEN
+>            PMTB(IW,JT)=PMTB(IW,JT)
+>      *      +PM(JL,JK,JT)*(SNFRAC(JL))*GRVOL(JL,JK)
+>           ELSE
+> 	   PMTB(IW,JT)=PMTB(IW,JT)
+68a99,101
+>           ENDIF
+> 	 ENDIF
+> 
+69a103
+> 
+77c111,114
+<        DO 102 JK=1,NLEVEL
+---
+> 
+>        TOTMASS=0.
+>        TOTVOL=0.
+>        DO 102 JK=1,NLEV
+81a119,120
+>          TOTMASS=TOTMASS+GRMASS(JL,JK)
+> 	 TOTVOL=TOTVOL+GRVOL(JL,JK)
+83a123,131
+>        DO 1002 JK=NLEV+1,NLEVEL
+>        DO 1002 JL=1,NLON
+>          IW=IWHERE(JL,JK)
+>          ATWEI(IW)=ATWEI(IW)+(VEGFRAC(JL)+WSFRAC(JL))*GRMASS(JL,JK)
+>          ATVOL(IW)=ATVOL(IW)+(VEGFRAC(JL)+WSFRAC(JL))*GRVOL(JL,JK)
+>          TOTMASS=TOTMASS+(VEGFRAC(JL)+WSFRAC(JL))*GRMASS(JL,JK)
+> 	 TOTVOL=TOTVOL+(VEGFRAC(JL)+WSFRAC(JL))*GRVOL(JL,JK)
+>  1002  CONTINUE
+> 
+87c135,136
+<         WRITE (NUNBUD,*) IMON,JDAY,LTIME,DTIME,NSTOP
+---
+>          WRITE (NUNBUD,*) 
+>      &     IMON,JDAY,LTIME,DTIME,NSTOP,ICHEMTYPE,NTRACT,KG3X
+89c138
+< C LG-  writing of location of the selected grid square/column
+---
+> C LG-    writing of location of the selected grid square/column
+91c140
+<         WRITE (NUNBUD,*) DLAT,DLON 
+---
+>          WRITE (NUNBUD,*) DLAT,DLON 
+95,96c144,149
+<        WRITE (NUNBUD,*) ATWEI,ATVOL
+<        WRITE (NUNBUD,*) PMTB,BXT,PMLOCTB,BG3,PMTBM,PMLOCTBM,BRX
+---
+>        WRITE (NUNBUD,*) AREA,ATWEI,ATVOL
+>        IF (KG3X.GT.0) THEN 
+>           WRITE (NUNBUD,*) PMTB,BXT,PMLOCTB,BG3,PMTBM,PMLOCTB,BRX
+>        ELSE
+>           WRITE (NUNBUD,*) PMTB,BXT,PMTBM,BRX
+>        ENDIF
+99c152
+< 	CALL RESETR (BXT,NDIM*NFIELD*NTRAC,0.)
+---
+>      	CALL RESETR (BXT,NDIM*NFIELD*NTRAC,0.)
+121c174,184
+<        IF (LAGRIAN.AND.ILSTYPE.GT.1) NLEV2=NLEVT
+---
+> 
+> C LG-  for lagragian simulations over land, the total numbers of layers
+> C      resembles that of the number of atmospheric layers plus the total
+> C      number of vegetation layers, defined by NLEVV in parchem.h for the
+> C      multilayer approach and 1 extra layer for the bulk vegetation mode.
+> 
+>        IF (LBIOSPH.AND.LAGRIAN.AND.ILSTYPE.GT.1) NLEV2=NLEVT
+>        IF (LBULKVEG.AND.LAGRIAN.AND.ILSTYPE.GT.1) NLEV2=NLEV+1
+>        IF (LVEG_MLAY.AND.LAGRIAN.AND.ILSTYPE.GT.1) NLEV2=NLEV+NLEVV_ML
+>        IF (LSNOW_MLAY.AND.LAGRIAN.AND.ILSTYPE.GT.1) NLEV2=NLEV+NLEVS_ML
+> 	
+124,126c187,228
+<        IF (NSTEP.EQ.0) THEN
+<         FNAME='output/1d_chem.out'
+<         OPEN(UNIT=NUN1DCHEM,FILE=FNAME,STATUS='UNKNOWN')
+---
+> C LG-  for the an experiment with an actual canopy height less than
+> C      the default maximum canopy height for forest (30 meters), the
+> C      concentrations for the layers within the canopy which are not
+> C      resolved are assigned the concentration of the lowest resolved
+> C      canopy layer
+> 
+>        DO 298 JT=1,NTRAC
+>        DO 298 JK=1,NLEV2
+>        DO 298 JL=1,NLON
+>         IF (NTRAC.EQ.NTRACT) THEN 
+> 	 IF (JT.NE.ioh.AND.JT.NE.iho2.AND.JT.NE.irad) THEN
+> 	  ZPM(JL,JK,JT)=PM(JL,JK,JT)/ZRHOA(JL,MIN(NLEVEL,JK))
+> 	 ELSE
+>           ZPM(JL,JK,JT)=PM(JL,JK,JT)
+> 	 ENDIF
+>         ELSE
+> 	 IF (JT.NE.irad) THEN
+>           ZPM(JL,JK,JT)=PM(JL,JK,JT)/ZRHOA(JL,MIN(NLEVEL,JK)) 
+>          ELSE
+> 	  ZPM(JL,JK,JT)=PM(JL,JK,JT)
+> 	 ENDIF
+>         ENDIF 
+> 
+> C LG-   bulk vegetation and 2-layer vegetation/snow model concentrations
+> 
+>         IF (LBULKVEG.AND.JK.GT.NLEV.OR.LVEG_MLAY.AND.JK.GT.NLEV.OR.
+>      &      LSNOW_MLAY.AND.JK.GT.NLEV) THEN 
+>          JJK=JK-NLEV
+>          IF (NTRAC.EQ.NTRACT) THEN 
+>  	  IF (JT.NE.ioh.AND.JT.NE.iho2.AND.JT.NE.irad) THEN
+> 	   ZPM(JL,JK,JT)=PM(JL,JK,JT)/ZRHOA(JL,MIN(NLEVEL,JK))
+> 	  ELSE
+>            ZPM(JL,JK,JT)=PM(JL,JK,JT)
+> 	  ENDIF
+>          ELSE
+> 	  IF (JT.NE.irad) THEN
+>            ZPM(JL,JK,JT)=PM(JL,NLEV+JJK,JT)/ZRHOA(JL,MIN(NLEVEL,JK)) 
+>           ELSE
+> 	   ZPM(JL,JK,JT)=PM(JL,NLEV+JJK,JT)
+> 	  ENDIF
+>          ENDIF 
+> 	ENDIF
+128,129c230,232
+<         WRITE(NUN1DCHEM,*) NSTOP,NLEVPR,IS,DTIME
+<         WRITE(NUN1DCHEM,*) NLEV1,NLEV2 
+---
+> C LG-   in case of a not resolved canopy layer (lagragian simulations),
+> C       indicated by a negative height, the concentration of the 
+> C       surface layer has been assigned 
+131c234,236
+<        ENDIF
+---
+>         IF (HGHT(JK).LT.0.) THEN
+> 	  ZPM(JL,JK,JT)=ZPM(JL,NLEV,JT)
+> 	ENDIF
+133c238,240
+<        DO 300 JL=1,NLON
+---
+>   298  CONTINUE
+> 
+> C LG-  and the short-lived species
+135,136c242,249
+<        DO 899 JK=1,NLEVEL
+<         JJ=NLEVEL+1-JK
+---
+>        DO 299 JT=1,NG3X
+>        DO 299 JK=1,NLEV2
+>        DO 299 JL=1,NLON
+>         IF (JT.NE.ioh.AND.JT.NE.iho2) THEN
+>          ZPMLOC(JL,JK,JT)=PMLOC(JL,JK,JT)/ZRHOA(JL,MIN(NLEVEL,JK))
+>         ELSE
+>          ZPMLOC(JL,JK,JT)=PMLOC(JL,JK,JT) 
+>         ENDIF 
+138c251,252
+< C LG-   calculation of actual height
+---
+> C LG-   bulk vegetation and 2-layer vegetation-snow/ice pack model 
+> C       concentrations
+140,144c254,258
+<         IF (JK.LE.NLEV) THEN
+< 	 HGHT(JK)=Z(JL,JK)
+< 	ELSE
+<          IF (NLEVVEG.GT.0) THEN
+<           HGHT(JK)=(HCCORR/NLEVVEG)*JJ-0.5*(HCCORR/NLEVVEG)
+---
+>         IF ((LBULKVEG.AND.JK.GT.NLEV).OR.(LVEG_MLAY.AND.JK.GT.NLEV).OR.
+>      &      (LSNOW_MLAY.AND.JK.GT.NLEV)) THEN 
+>          JJK=JK-NLEV
+>          IF (JT.NE.ioh.AND.JT.NE.iho2) THEN
+>           ZPMLOC(JL,JK,JT)=PMLOC(JL,NLEV+JJK,JT)/ZRHOA(JL,MIN(NLEVEL,JK))
+146,147c260,261
+<           HGHT(JK)=0.
+<          ENDIF
+---
+>           ZPMLOC(JL,JK,JT)=PMLOC(JL,NLEV+JJK,JT) 
+>          ENDIF 
+150c264,273
+<   899  CONTINUE
+---
+> C LG-   in case of a not resolved canopy layer (lagragian simulations),
+> C       indicated by a negative height, the concentration of the 
+> C       surface layer has been assigned 
+> 
+>         IF (HGHT(JK).LT.0.) THEN
+> 	  ZPMLOC(JL,JK,JT)=ZPMLOC(JL,NLEV,JT)
+> 	ENDIF
+> 
+>   299  CONTINUE
+> 
+153,158c276,278
+<          IF (LAGRIAN.AND.LBIOSPH) THEN
+< 	  WRITE (NUN1DCHEM,*) (Z(JL,JK),JK=NLEV2,NLEV1,-1)
+< 	 ELSE 
+< 	  WRITE (NUN1DCHEM,*) (HGHT(JK),JK=NLEV2,NLEV1,-1)
+<          ENDIF
+<          WRITE (NUN1DCHEM,*) (ZP(JL,JK),JK=NLEV2,NLEV1,-1)
+---
+>         OPEN(UNIT=NUN1DCHEM,FILE='/data/ganzevl/racmo/output/1d_chem.out',STATUS='UNKNOWN')
+>         WRITE(NUN1DCHEM,*) NSTOP,NLEV,NLEVPR,IS,DTIME,ICHEMTYPE,NTRACT
+>         WRITE(NUN1DCHEM,*) NLEV1,NLEV2 
+161,186c281
+<        WRITE(NUN1DCHEM,*)NSTEP,JDAY,GMT,LTIME,HC,TRPHGT,PBLHGT
+< 
+< C LG-  for the an experiment with an actual canopy height less than
+< C      the default maximum canopy height for forest (30 meters), the 
+< C      concentration fields are copied in such a way that the concentration 
+< C      fields, written to the files used for graphical interpretation, are  
+< C      representative for a reference height relatively to a zero height
+< C      of the canopy floor, bare soil, ocean surface. So for a actual canopy
+< C      height of 15 m, resembling three layers for a 6-layer canopy
+< C      representation, the concentration at the reference height of 64 m is 
+< C      corrected with 15 meters (HCMAX-HC)
+< 
+<        DO 999 JT=1,NTRAC
+<        DO 999 JK=1,NLEVT
+<          ZPM(JL,JK,JT)=PM(JL,JK,JT)
+<          IF (LBIOSPH) THEN
+<            DH=(NLEVV-NLEVVEG)*(HCMAX/NLEVV)
+<            IF (JK.LT.NLEVT) THEN
+<              DZ=Z(JL,JK)-Z(JL,JK+1)
+< 	   ELSE
+< 	     DZ=Z(JL,NLEVT)
+< 	   ENDIF
+< 	   ZPM(JL,JK,JT)=PM(JL,JK,JT)*MAX(0.,((DZ-DH)/DZ))+
+<      *      PM(JL,MIN(NLEVT,JK+1),JT)*MIN(1.,(DH/DZ))
+<            IF (DH/DZ.GT.1) 
+<      *     ZPM(JL,JK,JT)=PM(JL,MIN(NLEV,JK-NLEVVEG),JT)
+---
+>        DO 300 JL=1,NLON
+188c283,284
+< C LG-      not for methane
+---
+>        WRITE (NUN1DCHEM,*) (HGHT(JK),JK=NLEV2,NLEV1,-1)
+>        WRITE (NUN1DCHEM,*) (ZP(JL,JK),JK=NLEV2,NLEV1,-1)
+190c286,287
+<            IF (JT.EQ.3) ZPM(JL,JK,JT)=PM(JL,JK,JT)
+---
+> C LG-  14092004+ added the RHOA to be able to plot OH and HO2 also in  
+> C      volume mixing ratios
+192c289
+<          ENDIF
+---
+>        WRITE (NUN1DCHEM,*) (ZRHOA(JL,JK),JK=NLEV2,NLEV1,-1)
+194c291,292
+<   999  CONTINUE
+---
+>        WRITE (NUN1DCHEM,'(a14)') LDATLTIME
+>        WRITE (NUN1DCHEM,*)  NSTEP,JDAY,GMT,LTIME,HC,TRPHGT,PBLHGT 
+197c295
+< 
+---
+>        
+199,216c297,298
+<         IF (JT.NE.30.AND.JT.NE.31) THEN
+<          WRITE (NUN1DCHEM,5005) NSTEP,JT,
+<      *     (MAX(1.E-10,ZPM(JL,JK,JT)/ZRHOA(JL,JK)),
+<      *       JK=NLEV2,NLEV1,-1)
+< 	 ZPMBULK(JT) = 0.
+< 	 DO JK=KPBLHE(1),NLEV
+< 	   ZPMBULK(JT) = ZPMBULK(JT) + ZDZ(JL,JK)*ZPM(JL,JK,JT)/ZRHOA(JL,JK)
+<          ENDDO
+< 	 ZPMBULK(JT) = ZPMBULK(JT)/(Z(JL,KPBLHE(1))+0.5*ZDZ(JL,KPBLHE(1)))
+<         ELSE
+<           WRITE (NUN1DCHEM,5005) NSTEP,JT,(MAX(1.E-10,ZPM(JL,JK,JT)),
+<      *       JK=NLEV2,NLEV1,-1) 
+< 	 ZPMBULK(JT) = 0.
+< 	 DO JK=KPBLHE(1),NLEV
+< 	   ZPMBULK(JT) = ZPMBULK(JT) + ZDZ(JL,JK)*ZPM(JL,JK,JT)
+<          ENDDO
+< 	 ZPMBULK(JT) = ZPMBULK(JT)/(Z(JL,KPBLHE(1))+0.5*ZDZ(JL,KPBLHE(1)))
+<          ENDIF 
+---
+>         WRITE (NUN1DCHEM,5005) NSTEP,JT,
+>      *    (ZPM(JL,JK,JT),JK=NLEV2,NLEV1,-1)
+218a301,302
+> C LG-  and the short-lived species
+> 
+220c304
+<          IF (JT.NE.1.AND.JT.NE.2) THEN 
+---
+>          IF (JT.NE.ioh.AND.JT.NE.iho2) THEN 
+222,229c306
+<      *     (MAX(1.E-10,PMLOC(JL,JK,JT)/ZRHOA(JL,JK)),
+<      *       JK=NLEV2,NLEV1,-1)
+< 	  PMLOCBULK(JT) = 0.
+< 	  DO JK=KPBLHE(1),NLEV
+< 	    PMLOCBULK(JT) = PMLOCBULK(JT) + ZDZ(JL,JK)*PMLOC(JL,JK,JT)/
+<      *	    ZRHOA(JL,JK)
+<           ENDDO
+< 	  PMLOCBULK(JT) = PMLOCBULK(JT)/(Z(JL,KPBLHE(1))+0.5*ZDZ(JL,KPBLHE(1)))
+---
+>      *     (MAX(1.E-10,ZPMLOC(JL,JK,JT)),JK=NLEV2,NLEV1,-1)
+231,237c308,309
+<           WRITE (NUN1DCHEM,5005) NSTEP,JT,(MAX(1.E-10,PMLOC(JL,JK,JT)),
+<      *       JK=NLEV2,NLEV1,-1) 
+< 	  PMLOCBULK(JT) = 0.
+< 	  DO JK=KPBLHE(1),NLEV
+< 	    PMLOCBULK(JT) = PMLOCBULK(JT) + ZDZ(JL,JK)*PMLOC(JL,JK,JT)
+<           ENDDO
+< 	  PMLOCBULK(JT) = PMLOCBULK(JT)/(Z(JL,KPBLHE(1))+0.5*ZDZ(JL,KPBLHE(1)))
+---
+>           WRITE (NUN1DCHEM,5005) NSTEP,JT,
+>      *     (MAX(1.E-10,ZPMLOC(JL,JK,JT)),JK=NLEV2,NLEV1,-1) 
+247,301c319
+<  5005 FORMAT (2I5,24(1pE10.2))
+< 
+< C ACP-output of bulk quantities and profiles of intensities of segregation
+<         IF (NSTEP.EQ.0) THEN
+<           FNAME='output/bulk.out'
+<           OPEN(UNIT=NUNBULK,FILE=FNAME,STATUS='UNKNOWN')
+< 
+<           WRITE(NUNBULK,*) NSTOP,IS,DTIME
+< 
+<         ENDIF
+<         WRITE(NUNBULK,*)NSTEP,JDAY,GMT,LTIME,HC,TRPHGT,PBLHGT
+< 
+<         DO 305 JT=1,NTRAC
+<         IF (JT.NE.30.AND.JT.NE.31) THEN
+<          WRITE (NUNBULK,5005) NSTEP,JT,
+<      *     MAX(1.E-10,ZPMBULK(JT))
+<          ELSE
+<           WRITE (NUNBULK,5005) NSTEP,JT,MAX(1.E-10,ZPMBULK(JT))
+<          ENDIF 
+<   305  CONTINUE
+< 
+<        DO 306 JT=1,KG3X
+<          IF (JT.NE.1.AND.JT.NE.2) THEN 
+<           WRITE (NUNBULK,5005) NSTEP,JT+NTRAC,
+<      *     MAX(1.E-10,PMLOCBULK(JT))
+<          ELSE
+<           WRITE (NUNBULK,5005) NSTEP,JT+NTRAC,
+<      *	    MAX(1.E-10,PMLOCBULK(JT))
+<          ENDIF        
+<   306  CONTINUE
+< 
+<           DO 304 I=1,NBINREAC
+<             WRITE (NUNBULK,5005) NSTEP,I,
+<      *         SIGN(1.,ISBULK(I))*MAX(1.E-10,ABS(ISBULK(I)))
+<   304   CONTINUE
+< 
+<         IF (NSTEP.EQ.NSTOP) CLOSE(NUNBULK)
+< 
+<         IF (NSTEP.EQ.0) THEN
+<           FNAME='output/1d_ishor.out'
+<           OPEN(UNIT=NUN1DISHOR,FILE=FNAME,STATUS='UNKNOWN')
+< 
+<           WRITE(NUN1DISHOR,*) NSTOP,NLEVPR,IS,DTIME
+<           WRITE(NUN1DISHOR,*) NLEV1,NLEV2 
+< 
+<         ENDIF
+< 
+<         IF (NSTEP.EQ.0) THEN
+<           IF (LAGRIAN.AND.LBIOSPH) THEN
+< 	    WRITE (NUN1DISHOR,*) (Z(JL,JK),JK=NLEV2,NLEV1,-1)
+<   	  ELSE 
+< 	    WRITE (NUN1DISHOR,*) (HGHT(JK),JK=NLEV2,NLEV1,-1)
+<           ENDIF
+<           WRITE (NUN1DISHOR,*) (ZP(JL,JK),JK=NLEV2,NLEV1,-1)
+<         ENDIF
+---
+> C LG- format for a maximum of 100 layers
+303,308c321
+<         WRITE(NUN1DISHOR,*)NSTEP,JDAY,GMT,LTIME,HC,TRPHGT,PBLHGT
+<           DO 303 I=1,NBINREAC
+<             WRITE (NUN1DISHOR,5005) NSTEP,I,
+<      *         (SIGN(1.,ISHOR(I,JK))*MAX(1.E-10,ABS(ISHOR(I,JK))),
+<      *           JK=NLEV2,NLEV1,-1)
+<   303   CONTINUE
+---
+>  5005 FORMAT (2I8,100(1pE12.4))
+310,311d322
+<         IF (NSTEP.EQ.NSTOP) CLOSE(NUN1DISHOR)
+< C ACP-end
